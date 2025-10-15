@@ -1,3 +1,4 @@
+# client.py
 import tkinter as tk
 from tkinter import messagebox
 import tkinter.scrolledtext as st
@@ -7,64 +8,87 @@ from flask_cors import CORS
 import threading
 from queue import Queue
 
-# === Flask mini server for incoming messages ===
+# --------------------------
+# Mini Flask (Client-side) to receive messages
+# --------------------------
 app = Flask(__name__)
 CORS(app)
 msg_queue = Queue()
 
 @app.route('/receive', methods=['POST'])
 def receive_message():
-    """
-    Server bu endpoint'e POST isteği gönderdiğinde,
-    mesaj GUI'de görüntülenecek şekilde kuyruğa alınır.
-    """
     data = request.get_json() or {}
     message = data.get('message', '')
     key = data.get('key', '')
-    msg_queue.put(f"SUNUCU'DAN GELEN: {message} (key={key})")
+    algorithms = data.get('algorithms', [])
+    msg_queue.put(f"SUNUCU'DAN GELEN [{', '.join(algorithms)} | key={key}]: {message}")
     return jsonify({'status': 'ok'})
 
 def run_flask():
-    """
-    Flask sunucusunu ayrı bir thread'de başlatır.
-    5001 portunda dinler, böylece server bu porta mesaj gönderebilir.
-    """
     app.run(host='0.0.0.0', port=5001, debug=False, use_reloader=False)
 
 def start_flask_thread():
     t = threading.Thread(target=run_flask, daemon=True)
     t.start()
 
-# === Mesaj gönderme (Client → Server) ===
-def send_message():
-    ip = ip_entry.get()
-    port = port_entry.get()
-    message = message_entry.get()
-    key = key_entry.get()
+# --------------------------
+# GUI ve gönderme işlemi
+# --------------------------
+def thread_send(server_ip, server_port, message, key, selected_algorithms):
+    try:
+        url = f"http://{server_ip}:{server_port}/encrypt"
+        payload = {'message': message, 'key': key, 'algorithms': selected_algorithms}
+        resp = requests.post(url, json=payload, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+        encrypted = data.get('encrypted_message') or data.get('error') or str(data)
+        root.after(0, lambda: result_label.config(text=f"Sunucudan Gelen (şifreli):\n{encrypted}"))
+    except Exception as e:
+        root.after(0, lambda: messagebox.showerror("Bağlantı Hatası", f"Sunucuya bağlanılamadı:\n{e}"))
+    finally:
+        root.after(0, lambda: send_button.config(state='normal'))
 
-    if not ip or not port or not message:
+def send_message():
+    server_ip = ip_entry.get().strip()
+    server_port = port_entry.get().strip()
+    message = message_entry.get().strip()
+    key = key_entry.get().strip()
+
+    # Seçili algoritmaları liste olarak al
+    selected_algorithms = [alg for alg, var in algorithm_vars.items() if var.get() == 1]
+
+    if not server_ip or not server_port or not message:
         messagebox.showwarning("Eksik Bilgi", "Lütfen IP, port ve mesaj alanlarını doldurun!")
         return
 
-    url = f"http://{ip}:{port}/encrypt"
+    if not selected_algorithms:
+        messagebox.showwarning("Eksik Seçim", "Lütfen en az bir şifreleme algoritması seçin!")
+        return
 
     try:
-        response = requests.post(url, json={'message': message, 'key': key})
-        if response.status_code == 200:
-            data = response.json()
-            result_label.config(text=f"Sunucudan Gelen (şifreli):\n{data['encrypted_message']}")
-        else:
-            messagebox.showerror("Hata", f"Sunucudan geçersiz yanıt alındı: {response.status_code}")
-    except Exception as e:
-        messagebox.showerror("Bağlantı Hatası", f"Sunucuya bağlanılamadı:\n{e}")
+        int(server_port)
+    except ValueError:
+        messagebox.showerror("Hata", "Port numarası geçerli bir sayı değil.")
+        return
 
-# === Flask'ı başlat ===
+    send_button.config(state='disabled')
+    threading.Thread(
+        target=thread_send,
+        args=(server_ip, server_port, message, key, selected_algorithms),
+        daemon=True
+    ).start()
+
+# --------------------------
+# Flask thread başlat
+# --------------------------
 start_flask_thread()
 
-# === Tkinter GUI ===
+# --------------------------
+# Tkinter GUI
+# --------------------------
 root = tk.Tk()
 root.title("Kriptoloji İstemci")
-root.geometry("500x600")
+root.geometry("540x680")
 
 tk.Label(root, text="Sunucu IP Adresi:").pack(pady=5)
 ip_entry = tk.Entry(root)
@@ -76,25 +100,40 @@ port_entry = tk.Entry(root)
 port_entry.pack()
 port_entry.insert(0, "5000")
 
+# Checkbox kısmı
+tk.Label(root, text="Şifreleme Algoritmaları:").pack(pady=5)
+
+# Buraya ekleyerek çoğaltabilirsin
+ALGORITHMS = ["Caesar", "Vigenere", "XOR", "Affine"]
+algorithm_vars = {}
+
+frame = tk.Frame(root)
+frame.pack(pady=5)
+
+for alg in ALGORITHMS:
+    var = tk.IntVar()
+    chk = tk.Checkbutton(frame, text=alg, variable=var)
+    chk.pack(anchor='w')
+    algorithm_vars[alg.lower()] = var  # küçük harfli anahtar kaydı
+
 tk.Label(root, text="Mesaj:").pack(pady=5)
-message_entry = tk.Entry(root, width=40)
+message_entry = tk.Entry(root, width=60)
 message_entry.pack()
 
 tk.Label(root, text="Anahtar:").pack(pady=5)
 key_entry = tk.Entry(root, width=20)
 key_entry.pack()
 
-tk.Button(root, text="Sunucuya Gönder", command=send_message).pack(pady=10)
+send_button = tk.Button(root, text="Sunucuya Gönder", command=send_message)
+send_button.pack(pady=10)
 
-result_label = tk.Label(root, text="", fg="blue", wraplength=450, justify="center")
+result_label = tk.Label(root, text="", fg="blue", wraplength=480, justify="center")
 result_label.pack(pady=10)
 
-# === Gelen mesajları gösterme alanı ===
 tk.Label(root, text="Sunucudan Gelen Mesajlar:").pack(pady=5)
-incoming_box = st.ScrolledText(root, width=60, height=12, state='disabled')
+incoming_box = st.ScrolledText(root, width=65, height=18, state='disabled')
 incoming_box.pack(padx=10, pady=5)
 
-# === Flask'tan gelen mesajları GUI'ye aktarma ===
 def poll_messages():
     while not msg_queue.empty():
         msg = msg_queue.get()
@@ -105,5 +144,4 @@ def poll_messages():
     root.after(200, poll_messages)
 
 root.after(200, poll_messages)
-
 root.mainloop()
