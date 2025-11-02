@@ -1,147 +1,87 @@
-# client.py
 import tkinter as tk
-from tkinter import messagebox
-import tkinter.scrolledtext as st
+from tkinter import ttk, messagebox
 import requests
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-import threading
-from queue import Queue
-
-# --------------------------
-# Mini Flask (Client-side) to receive messages
-# --------------------------
-app = Flask(__name__)
-CORS(app)
-msg_queue = Queue()
-
-@app.route('/receive', methods=['POST'])
-def receive_message():
-    data = request.get_json() or {}
-    message = data.get('message', '')
-    key = data.get('key', '')
-    algorithms = data.get('algorithms', [])
-    msg_queue.put(f"SUNUCU'DAN GELEN [{', '.join(algorithms)} | key={key}]: {message}")
-    return jsonify({'status': 'ok'})
-
-def run_flask():
-    app.run(host='0.0.0.0', port=5001, debug=False, use_reloader=False)
-
-def start_flask_thread():
-    t = threading.Thread(target=run_flask, daemon=True)
-    t.start()
-
-# --------------------------
-# GUI ve gönderme işlemi
-# --------------------------
-def thread_send(server_ip, server_port, message, key, selected_algorithms):
-    try:
-        url = f"http://{server_ip}:{server_port}/encrypt"
-        payload = {'message': message, 'key': key, 'algorithms': selected_algorithms}
-        resp = requests.post(url, json=payload, timeout=10)
-        resp.raise_for_status()
-        data = resp.json()
-        encrypted = data.get('encrypted_message') or data.get('error') or str(data)
-        root.after(0, lambda: result_label.config(text=f"Sunucudan Gelen (şifreli):\n{encrypted}"))
-    except Exception as e:
-        root.after(0, lambda: messagebox.showerror("Bağlantı Hatası", f"Sunucuya bağlanılamadı:\n{e}"))
-    finally:
-        root.after(0, lambda: send_button.config(state='normal'))
 
 def send_message():
-    server_ip = ip_entry.get().strip()
-    server_port = port_entry.get().strip()
-    message = message_entry.get().strip()
-    key = key_entry.get().strip()
+    ip = ip_entry.get()
+    port = port_entry.get()
+    message = message_entry.get()
+    key = key_entry.get()
+    algorithm = algorithm_var.get()
 
-    # Seçili algoritmaları liste olarak al
-    selected_algorithms = [alg for alg, var in algorithm_vars.items() if var.get() == 1]
-
-    if not server_ip or not server_port or not message:
+    if not ip or not port or not message:
         messagebox.showwarning("Eksik Bilgi", "Lütfen IP, port ve mesaj alanlarını doldurun!")
         return
 
-    if not selected_algorithms:
-        messagebox.showwarning("Eksik Seçim", "Lütfen en az bir şifreleme algoritması seçin!")
-        return
+    url = f"http://{ip}:{port}/encrypt"
 
     try:
-        int(server_port)
-    except ValueError:
-        messagebox.showerror("Hata", "Port numarası geçerli bir sayı değil.")
-        return
+        response = requests.post(url, json={
+            'message': message,
+            'key': key,
+            'algorithm': algorithm
+        })
+        if response.status_code == 200:
+            data = response.json()
+            result_label.config(
+                text=f"Sunucudan Gelen:\n{data['encrypted_message']}",
+                fg="blue"
+            )
+        else:
+            messagebox.showerror("Hata", f"Sunucudan geçersiz yanıt alındı: {response.status_code}")
+    except Exception as e:
+        messagebox.showerror("Bağlantı Hatası", f"Sunucuya bağlanılamadı:\n{e}")
 
-    send_button.config(state='disabled')
-    threading.Thread(
-        target=thread_send,
-        args=(server_ip, server_port, message, key, selected_algorithms),
-        daemon=True
-    ).start()
+# --- GUI ---
 
-# --------------------------
-# Flask thread başlat
-# --------------------------
-start_flask_thread()
-
-# --------------------------
-# Tkinter GUI
-# --------------------------
 root = tk.Tk()
 root.title("Kriptoloji İstemci")
-root.geometry("540x680")
+root.geometry("420x480")
 
-tk.Label(root, text="Sunucu IP Adresi:").pack(pady=5)
-ip_entry = tk.Entry(root)
-ip_entry.pack()
+tk.Label(root, text="🔐 Kriptoloji Şifreleme Arayüzü", font=("Arial", 14, "bold")).pack(pady=10)
+
+# IP ve Port Girişi
+frame_conn = tk.Frame(root)
+frame_conn.pack(pady=5)
+
+tk.Label(frame_conn, text="Sunucu IP:").grid(row=0, column=0, padx=5, pady=5)
+ip_entry = tk.Entry(frame_conn)
+ip_entry.grid(row=0, column=1)
 ip_entry.insert(0, "127.0.0.1")
 
-tk.Label(root, text="Port:").pack(pady=5)
-port_entry = tk.Entry(root)
-port_entry.pack()
+tk.Label(frame_conn, text="Port:").grid(row=1, column=0, padx=5, pady=5)
+port_entry = tk.Entry(frame_conn)
+port_entry.grid(row=1, column=1)
 port_entry.insert(0, "5000")
 
-# Checkbox kısmı
-tk.Label(root, text="Şifreleme Algoritmaları:").pack(pady=5)
-
-# Buraya ekleyerek çoğaltabilirsin
-ALGORITHMS = ["Caesar", "Vigenere", "XOR", "Affine"]
-algorithm_vars = {}
-
-frame = tk.Frame(root)
-frame.pack(pady=5)
-
-for alg in ALGORITHMS:
-    var = tk.IntVar()
-    chk = tk.Checkbutton(frame, text=alg, variable=var)
-    chk.pack(anchor='w')
-    algorithm_vars[alg.lower()] = var  # küçük harfli anahtar kaydı
-
+# Mesaj ve Anahtar
 tk.Label(root, text="Mesaj:").pack(pady=5)
-message_entry = tk.Entry(root, width=60)
+message_entry = tk.Entry(root, width=40)
 message_entry.pack()
 
 tk.Label(root, text="Anahtar:").pack(pady=5)
-key_entry = tk.Entry(root, width=20)
+key_entry = tk.Entry(root, width=40)
 key_entry.pack()
 
-send_button = tk.Button(root, text="Sunucuya Gönder", command=send_message)
-send_button.pack(pady=10)
+# Algoritma Seçimi
+tk.Label(root, text="Şifreleme Algoritması Seç:").pack(pady=5)
 
-result_label = tk.Label(root, text="", fg="blue", wraplength=480, justify="center")
+algorithm_var = tk.StringVar()
+algorithm_combobox = ttk.Combobox(root, textvariable=algorithm_var, width=37, state="readonly")
+algorithm_combobox['values'] = [
+    "Caesar Cipher",
+    "Substitution Cipher",
+    "Vigenere Cipher",
+    "Playfair Cipher"
+]
+algorithm_combobox.current(0)
+algorithm_combobox.pack(pady=5)
+
+# Gönder Butonu
+tk.Button(root, text="Sunucuya Gönder", command=send_message, bg="lightgreen", width=20).pack(pady=15)
+
+# Sonuç
+result_label = tk.Label(root, text="", wraplength=380, justify="center", font=("Arial", 10))
 result_label.pack(pady=10)
 
-tk.Label(root, text="Sunucudan Gelen Mesajlar:").pack(pady=5)
-incoming_box = st.ScrolledText(root, width=65, height=18, state='disabled')
-incoming_box.pack(padx=10, pady=5)
-
-def poll_messages():
-    while not msg_queue.empty():
-        msg = msg_queue.get()
-        incoming_box.configure(state='normal')
-        incoming_box.insert('end', msg + "\n")
-        incoming_box.configure(state='disabled')
-        incoming_box.see('end')
-    root.after(200, poll_messages)
-
-root.after(200, poll_messages)
 root.mainloop()
