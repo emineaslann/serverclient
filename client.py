@@ -72,7 +72,8 @@ algorithm_combo['values'] = [
     "Substitution Cipher",
     "Vigenere Cipher",
     "Playfair Cipher",
-    "Rail Fence Cipher"
+    "Rail Fence Cipher",
+    "Route Cipher"
 ]
 algorithm_combo.current(0)
 algorithm_combo.pack(pady=5)
