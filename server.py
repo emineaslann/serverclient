@@ -18,6 +18,9 @@ def get_cipher_instance(algorithm):
     from encryption_algorithms.playfair_cipher import PlayfairCipher
     from encryption_algorithms.rail_fence_cipher import RailFenceCipher
     from encryption_algorithms.route_cipher import RouteCipher
+    from encryption_algorithms.columnar_transposition_cipher import ColumnarTranspositionCipher
+    from encryption_algorithms.pigpen_cipher import PigpenCipher
+
 
     mapping = {
         "Caesar Cipher": CaesarCipher,
@@ -26,6 +29,9 @@ def get_cipher_instance(algorithm):
         "Playfair Cipher": PlayfairCipher,
         "Rail Fence Cipher": RailFenceCipher,
         "Route Cipher": RouteCipher,
+        "Columnar Transposition Cipher": ColumnarTranspositionCipher,
+        "Pigpen Cipher": PigpenCipher,
+
     }
 
     CipherClass = mapping.get(algorithm.strip())
