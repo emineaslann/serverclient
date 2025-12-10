@@ -12,6 +12,10 @@ received_messages = []  # GUI'de görüntülenecek mesajlar listesi
 
 # --- Algoritma seçici ---
 def get_cipher_instance(algorithm):
+    from encryption_algorithms.aes_cipher import AESCipher
+    from encryption_algorithms.des_cipher import DESCipher
+    from encryption_algorithms.rsa_cipher import RSACipher
+
     from encryption_algorithms.caesar_cipher import CaesarCipher
     from encryption_algorithms.substitution_cipher import SubstitutionCipher
     from encryption_algorithms.vigenere_cipher import VigenereCipher
@@ -21,6 +25,8 @@ def get_cipher_instance(algorithm):
     from encryption_algorithms.columnar_transposition_cipher import ColumnarTranspositionCipher
     from encryption_algorithms.pigpen_cipher import PigpenCipher
 
+    from encryption_algorithms.manual_aes import ManualAES
+    from encryption_algorithms.manual_des import ManualDES
 
     mapping = {
         "Caesar Cipher": CaesarCipher,
@@ -32,40 +38,67 @@ def get_cipher_instance(algorithm):
         "Columnar Transposition Cipher": ColumnarTranspositionCipher,
         "Pigpen Cipher": PigpenCipher,
 
+        "AES-128 (kütüphaneli)": AESCipher,
+        "DES (kütüphaneli)": DESCipher,
+        "RSA (kütüphaneli)": RSACipher,
+
+        "AES-128 (manuel)": ManualAES,
+        "DES (manuel)": ManualDES,
     }
 
     CipherClass = mapping.get(algorithm.strip())
-    if CipherClass:
-        return CipherClass()
-    else:
-        print(f"[Uyarı] Tanınmayan algoritma: {algorithm}")
-        return None
+    return CipherClass() if CipherClass else None
 
 
-# --- Şifreleme endpoint ---
+# --- Şifreleme / Deşifreleme endpoint ---
 @app.route("/encrypt", methods=["POST"])
 def encrypt():
     data = request.get_json()
     message = data.get("message", "")
     key = data.get("key", "")
     algorithm = data.get("algorithm", "Caesar Cipher")
+    operation = data.get("operation", "Encrypt")  # <--- YENİ EKLENDİ
 
     cipher = get_cipher_instance(algorithm)
     if cipher is None:
         return jsonify({"error": f"Geçersiz algoritma: {algorithm}"}), 400
 
     try:
-        encrypted = cipher.encrypt(message, key)
-    except Exception as e:
-        encrypted = f"Hata: {str(e)}"
+        if operation == "Encrypt":
+            result = cipher.encrypt(message, key)
+        else:
+            result = cipher.decrypt(message, key)
 
-    received_messages.append((message, algorithm, encrypted))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+    # --- GUI Güncelleme ---
+    if operation == "Encrypt":
+        if isinstance(result, dict):
+            enc = result.get("encrypted_message", "")
+        else:
+            enc = result
+        received_messages.append((f"[Encrypt] {message}", algorithm, enc))
+    else:
+        if isinstance(result, dict):
+            dec = result.get("decrypted_message", "")
+        else:
+            dec = result
+        received_messages.append((f"[Decrypt] {message}", algorithm, dec))
+
     update_gui()
 
-    return jsonify({"encrypted_message": encrypted})
+    # --- JSON Döndür ---
+    if isinstance(result, dict):
+        return jsonify(result)
+    else:
+        if operation == "Encrypt":
+            return jsonify({"encrypted_message": result})
+        else:
+            return jsonify({"decrypted_message": result})
 
 
-# --- Flask Sunucusunu Ayrı Thread'de Çalıştır ---
+# --- Flask Sunucusu Thread ---
 def run_flask():
     app.run(host="0.0.0.0", port=5000, debug=False)
 
@@ -73,9 +106,9 @@ def run_flask():
 # --- GUI Fonksiyonları ---
 def update_gui():
     message_list.delete(0, tk.END)
-    for msg, algo, enc in received_messages:
+    for msg, algo, res in received_messages:
         message_list.insert(
-            tk.END, f"Gelen: {msg} | Algoritma: {algo} | Şifreli: {enc}"
+            tk.END, f"{msg} | Algoritma: {algo} | Sonuç: {res}"
         )
 
 

@@ -1,3 +1,4 @@
+# encryption_algorithms/pigpen_cipher.py
 from encryption_algorithms.base_cipher import BaseCipher
 
 class PigpenCipher(BaseCipher):
@@ -8,7 +9,6 @@ class PigpenCipher(BaseCipher):
         'S': '𐍂', 'T': '𐍃', 'U': '𐍄', 'V': '𐍅', 'W': '𐍆', 'X': '𐍇',
         'Y': '𐍈', 'Z': '𐍉'
     }
-
     reverse_map = {v: k for k, v in pigpen_map.items()}
 
     def encrypt(self, text, key=None):
