@@ -24,6 +24,7 @@ def get_cipher_instance(algorithm):
     from encryption_algorithms.route_cipher import RouteCipher
     from encryption_algorithms.columnar_transposition_cipher import ColumnarTranspositionCipher
     from encryption_algorithms.pigpen_cipher import PigpenCipher
+    from encryption_algorithms.hill_cipher import HillCipher 
 
     from encryption_algorithms.manual_aes import ManualAES
     from encryption_algorithms.manual_des import ManualDES
@@ -37,6 +38,7 @@ def get_cipher_instance(algorithm):
         "Route Cipher": RouteCipher,
         "Columnar Transposition Cipher": ColumnarTranspositionCipher,
         "Pigpen Cipher": PigpenCipher,
+        "Hill Cipher": HillCipher, 
 
         "AES-128 (kütüphaneli)": AESCipher,
         "DES (kütüphaneli)": DESCipher,

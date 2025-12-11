@@ -91,6 +91,7 @@ algorithm_combo['values'] = [
     "Route Cipher",
     "Columnar Transposition Cipher",
     "Pigpen Cipher",
+    "Hill Cipher",
     "AES-128 (kütüphaneli)",
     "DES (kütüphaneli)",
     "RSA (kütüphaneli)",
