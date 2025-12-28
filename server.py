@@ -1,3 +1,5 @@
+print(">>> DOĞRU SERVER.PY ÇALIŞIYOR <<<")
+
 import threading
 import tkinter as tk
 from flask import Flask, request, jsonify
@@ -8,6 +10,11 @@ app = Flask(__name__)
 CORS(app)
 
 received_messages = []  # GUI'de görüntülenecek mesajlar listesi
+
+@app.route("/")
+def home():
+    return "SERVER CALISIYOR"
+
 
 
 # --- Algoritma seçici ---

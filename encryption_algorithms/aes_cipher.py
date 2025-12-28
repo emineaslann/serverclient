@@ -11,6 +11,8 @@ def pkcs7_pad(data: bytes) -> bytes:
 
 def pkcs7_unpad(data: bytes) -> bytes:
     pad_len = data[-1]
+    if pad_len < 1 or pad_len > BLOCK_SIZE:
+        raise ValueError("Geçersiz padding")
     return data[:-pad_len]
 
 class AESCipher:

@@ -2,6 +2,13 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import requests
 from Crypto.PublicKey import RSA
+import time
+from tkinter import filedialog
+from Crypto.Cipher import AES, DES
+from Crypto.Util.Padding import pad, unpad
+import os
+
+
 
 def generate_rsa_keypair():
     key = RSA.generate(2048)
@@ -29,26 +36,86 @@ def send_message(operation):
         'message': message,
         'key': key,
         'algorithm': algorithm,
-        'operation': operation   # <<< ÖNEMLİ EKLEME
+        'operation': operation
     }
 
     try:
+        start_time = time.perf_counter()   # ⏱️ BAŞLA
         response = requests.post(url, json=data)
+        total_time = time.perf_counter() - start_time  # ⏱️ BİT
+
+        if response.status_code != 200:
+            messagebox.showerror(
+                "Sunucu Hatası",
+                f"Status Code: {response.status_code}\n\n{response.text}"
+            )
+            return
+
         data = response.json()
 
         if "encrypted_message" in data:
-            result_label.config(text="Sunucudan Gelen Şifreli Mesaj:\n" +
-                                    data["encrypted_message"], fg="blue")
+            result_label.config(
+                text=(
+                    "Sunucudan Gelen Şifreli Mesaj:\n"
+                    + data["encrypted_message"]
+                    + f"\n\n⏱️ Toplam Süre: {total_time:.6f} saniye"
+                ),
+                fg="blue"
+            )
+
         elif "decrypted_message" in data:
-            result_label.config(text="Sunucudan Gelen Çözülmüş Mesaj:\n" +
-                                    data["decrypted_message"], fg="green")
-        elif "error" in data:
-            messagebox.showerror("Hata", data["error"])
-        else:
-            result_label.config(text=str(data))
+            result_label.config(
+                text=(
+                    "Sunucudan Gelen Çözülmüş Mesaj:\n"
+                    + data["decrypted_message"]
+                    + f"\n\n⏱️ Toplam Süre: {total_time:.6f} saniye"
+                ),
+                fg="green"
+            )
 
     except Exception as e:
         messagebox.showerror("Bağlantı Hatası", str(e))
+
+def encrypt_file():
+    algo = algorithm_combo.get()
+    key_text = key_entry.get().encode()
+
+    if algo not in ["AES-128 (kütüphaneli)", "DES (kütüphaneli)"]:
+        messagebox.showwarning("Uyarı", "Dosya şifreleme sadece AES veya DES içindir.")
+        return
+
+    file_path = filedialog.askopenfilename()
+    if not file_path:
+        return
+
+    with open(file_path, "rb") as f:
+        data = f.read()
+
+    start = time.perf_counter()
+
+    if algo == "AES-128 (kütüphaneli)":
+        key = key_text[:16].ljust(16, b'\0')
+        cipher = AES.new(key, AES.MODE_ECB)
+        encrypted = cipher.encrypt(pad(data, 16))
+
+    elif algo == "DES (kütüphaneli)":
+        key = key_text[:8].ljust(8, b'\0')
+        cipher = DES.new(key, DES.MODE_ECB)
+        encrypted = cipher.encrypt(pad(data, 8))
+
+    elapsed = time.perf_counter() - start
+
+    out_path = file_path + ".enc"
+    with open(out_path, "wb") as f:
+        f.write(encrypted)
+
+    messagebox.showinfo(
+        "Dosya Şifrelendi",
+        f"Şifreli dosya:\n{out_path}\n\n⏱ Süre: {elapsed:.6f} saniye"
+    )
+
+
+
 
 
 root = tk.Tk()
@@ -120,4 +187,15 @@ result_label = tk.Label(root, text="", fg="blue",
                         font=("Consolas", 10))
 result_label.pack(pady=15)
 
+tk.Button(
+    root,
+    text="📁 DOSYA ŞİFRELE (AES/DES)",
+    command=encrypt_file,
+    bg="#ccccff",
+    width=30
+).pack(pady=10)
+
 root.mainloop()
+
+
+
